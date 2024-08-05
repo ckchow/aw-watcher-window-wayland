@@ -18,7 +18,7 @@ mod singleinstance;
 use std::env;
 use std::time::Duration;
 use std::os::unix::io::AsRawFd;
-
+use futures::executor::block_on;
 use mio::{Poll, Token, PollOpt, Ready, Events};
 use mio::unix::EventedFd;
 use timerfd::{TimerFd, TimerState, SetTimeFlags};
@@ -121,20 +121,21 @@ fn main() {
     println!("### Taking client locks");
     let host = "localhost";
     let port = match testing {
-        true => "5666",
-        false => "5600"
+        true => 5666,
+        false => 5600
     };
     let _window_lock = singleinstance::get_client_lock(&format!("aw-watcher-window-at-{}-on-{}", host, port)).unwrap();
     let _afk_lock = singleinstance::get_client_lock(&format!("aw-watcher-afk-at-{}-on-{}", host, port)).unwrap();
 
     println!("### Creating aw-client");
-    let client = aw_client_rust::AwClient::new(host, port, "aw-watcher-wayland");
+    let result = aw_client_rust::AwClient::new(host, port, "aw-watcher-wayland");
     let hostname = gethostname::gethostname().into_string().unwrap();
     let window_bucket = format!("aw-watcher-window_{}", hostname);
     let afk_bucket = format!("aw-watcher-afk_{}", hostname);
-    client.create_bucket_simple(&window_bucket, "currentwindow")
+    let client = result.unwrap();
+    block_on(client.create_bucket_simple(&window_bucket, "currentwindow"))
         .expect("Failed to create window bucket");
-    client.create_bucket_simple(&afk_bucket, "afkstatus")
+    block_on(client.create_bucket_simple(&afk_bucket, "afkstatus"))
         .expect("Failed to create afk bucket");
 
     println!("### Watcher is now running");
@@ -152,7 +153,7 @@ fn main() {
 
                     if let Some(ref prev_window) = prev_window {
                         let window_event = window_to_event(&prev_window);
-                        if client.heartbeat(&window_bucket, &window_event, HEARTBEAT_INTERVAL_MARGIN_S).is_err() {
+                        if block_on(client.heartbeat(&window_bucket, &window_event, HEARTBEAT_INTERVAL_MARGIN_S)).is_err() {
                             println!("Failed to send heartbeat");
                             break;
                         }
@@ -161,7 +162,7 @@ fn main() {
                     match current_window::get_focused_window() {
                         Some(current_window) => {
                             let window_event = window_to_event(&current_window);
-                            if client.heartbeat(&window_bucket, &window_event, HEARTBEAT_INTERVAL_MARGIN_S).is_err() {
+                            if block_on(client.heartbeat(&window_bucket, &window_event, HEARTBEAT_INTERVAL_MARGIN_S)).is_err() {
                                 println!("Failed to send heartbeat");
                                 break;
                             }
@@ -173,7 +174,7 @@ fn main() {
                     }
 
                     let afk_event = idle::get_current_afk_event();
-                    if client.heartbeat(&afk_bucket, &afk_event, HEARTBEAT_INTERVAL_MARGIN_S).is_err() {
+                    if block_on(client.heartbeat(&afk_bucket, &afk_event, HEARTBEAT_INTERVAL_MARGIN_S)).is_err() {
                         println!("Failed to send heartbeat");
                         break;
                     }
@@ -184,14 +185,14 @@ fn main() {
 
                     if let Some(ref prev_window) = prev_window {
                         let window_event = window_to_event(&prev_window);
-                        if client.heartbeat(&window_bucket, &window_event, HEARTBEAT_INTERVAL_MARGIN_S).is_err() {
+                        if block_on(client.heartbeat(&window_bucket, &window_event, HEARTBEAT_INTERVAL_MARGIN_S)).is_err() {
                             println!("Failed to send heartbeat");
                             break;
                         }
                     }
 
                     let afk_event = idle::get_current_afk_event();
-                    if client.heartbeat(&afk_bucket, &afk_event, HEARTBEAT_INTERVAL_MARGIN_S).is_err() {
+                    if block_on(client.heartbeat(&afk_bucket, &afk_event, HEARTBEAT_INTERVAL_MARGIN_S)).is_err() {
                         println!("Failed to send heartbeat");
                         break;
                     }

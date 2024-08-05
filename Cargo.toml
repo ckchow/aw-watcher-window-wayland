@@ -22,6 +22,7 @@ file-lock = "1.1"
 appdirs = "0.2"
 gethostname = "0.2"
 getopts = "0.2"
+futures = "0.3"
 
 aw-client-rust = { git = "https://github.com/ActivityWatch/aw-server-rust.git" }
 
